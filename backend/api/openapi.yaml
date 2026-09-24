@@ -1,0 +1,210 @@
+openapi: 3.0.3
+info:
+  title: 实验室设备管理系统 API
+  version: 1.0.0
+  description: 设备资产登记、借用归还、维护保养、使用预约与状态看板接口。
+servers:
+  - url: /api/v1
+tags:
+  - name: Auth
+  - name: Equipment
+  - name: Borrow
+  - name: Maintenance
+  - name: Reservation
+  - name: Category
+  - name: Dashboard
+  - name: Audit
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: 登录并获取 JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username: { type: string }
+                password: { type: string }
+      responses:
+        '200': { description: 登录成功 }
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: 当前登录用户信息
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+  /users:
+    get:
+      tags: [Auth]
+      summary: 分页查询用户
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: page_size, in: query, schema: { type: integer } }
+      responses:
+        '200': { description: 成功 }
+  /equipment:
+    get:
+      tags: [Equipment]
+      summary: 分页查询设备
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+    post:
+      tags: [Equipment]
+      summary: 登记设备
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+  /equipment/{id}:
+    get:
+      tags: [Equipment]
+      summary: 设备详情
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+    put:
+      tags: [Equipment]
+      summary: 更新设备
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+  /equipment/{id}/status:
+    patch:
+      tags: [Equipment]
+      summary: 修改设备资产状态（报废）
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+  /equipment/{id}/owner:
+    patch:
+      tags: [Equipment]
+      summary: 转移责任人
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+  /borrows:
+    get:
+      tags: [Borrow]
+      summary: 分页查询借用记录
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+    post:
+      tags: [Borrow]
+      summary: 提交借用申请
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+  /borrows/{id}/approve:
+    post:
+      tags: [Borrow]
+      summary: 审批通过
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+  /borrows/{id}/reject:
+    post:
+      tags: [Borrow]
+      summary: 驳回申请
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+  /borrows/{id}/return:
+    post:
+      tags: [Borrow]
+      summary: 确认归还
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+  /maintenance:
+    get:
+      tags: [Maintenance]
+      summary: 分页查询维护记录
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+    post:
+      tags: [Maintenance]
+      summary: 创建维护记录
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+  /maintenance/stats:
+    get:
+      tags: [Maintenance]
+      summary: 维护统计
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+  /reservations:
+    get:
+      tags: [Reservation]
+      summary: 分页查询预约
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+    post:
+      tags: [Reservation]
+      summary: 创建预约
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+  /reservations/{id}/approve:
+    post:
+      tags: [Reservation]
+      summary: 审批通过预约
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+  /reservations/{id}/reject:
+    post:
+      tags: [Reservation]
+      summary: 驳回预约
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+  /reservations/{id}/cancel:
+    post:
+      tags: [Reservation]
+      summary: 取消预约
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+  /categories:
+    get:
+      tags: [Category]
+      summary: 查询分类树
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+    post:
+      tags: [Category]
+      summary: 新增分类
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+  /dashboard/stats:
+    get:
+      tags: [Dashboard]
+      summary: 仪表盘统计
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+  /audit-logs:
+    get:
+      tags: [Audit]
+      summary: 分页查询审计日志
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

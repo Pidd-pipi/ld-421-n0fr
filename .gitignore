@@ -1,0 +1,25 @@
+# Node
+node_modules/
+dist/
+npm-debug.log*
+
+# 环境变量
+.env
+
+# 系统文件
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# 日志
+*.log
+
+# Go
+bin/
+backend/server
+*.exe
+*.test
+coverage.out
+backend/tmp/

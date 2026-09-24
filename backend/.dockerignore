@@ -1,0 +1,5 @@
+bin/
+server
+*.exe
+*.test
+coverage.out
