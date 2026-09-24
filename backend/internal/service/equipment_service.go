@@ -17,6 +17,7 @@ type EquipmentService struct {
 	repo         repository.EquipmentRepository
 	categoryRepo repository.CategoryRepository
 	userRepo     repository.UserRepository
+	disposalRepo repository.DisposalRepository
 	audit        *AuditService
 	logger       *slog.Logger
 }
@@ -26,10 +27,11 @@ func NewEquipmentService(
 	repo repository.EquipmentRepository,
 	categoryRepo repository.CategoryRepository,
 	userRepo repository.UserRepository,
+	disposalRepo repository.DisposalRepository,
 	audit *AuditService,
 	logger *slog.Logger,
 ) *EquipmentService {
-	return &EquipmentService{repo: repo, categoryRepo: categoryRepo, userRepo: userRepo, audit: audit, logger: logger}
+	return &EquipmentService{repo: repo, categoryRepo: categoryRepo, userRepo: userRepo, disposalRepo: disposalRepo, audit: audit, logger: logger}
 }
 
 // Create 登记入库新设备。
@@ -91,6 +93,11 @@ func (s *EquipmentService) Get(ctx context.Context, id uint) (*model.Equipment, 
 	if err != nil {
 		return nil, s.mapNotFound(err, "设备不存在")
 	}
+	if approval, err := s.disposalRepo.FindActiveByEquipment(ctx, id); err == nil {
+		equipment.DisposalStatus = string(approval.Status)
+	} else if !errors.Is(err, repository.ErrNotFound) {
+		return nil, fmt.Errorf("find active disposal approval: %w", err)
+	}
 	return equipment, nil
 }
 
@@ -100,22 +107,20 @@ func (s *EquipmentService) List(ctx context.Context, filter repository.Equipment
 	if err != nil {
 		return nil, 0, fmt.Errorf("list equipment: %w", err)
 	}
-	return list, total, nil
-}
-
-// Retire 报废设备。
-func (s *EquipmentService) Retire(ctx context.Context, id uint, actor Actor) error {
-	equipment, err := s.repo.FindByID(ctx, id)
+	ids := make([]uint, 0, len(list))
+	for i := range list {
+		ids = append(ids, list[i].ID)
+	}
+	activeApprovals, err := s.disposalRepo.MapActiveByEquipmentIDs(ctx, ids)
 	if err != nil {
-		return s.mapNotFound(err, "设备不存在")
+		return nil, 0, fmt.Errorf("map disposal approvals: %w", err)
 	}
-	if err := s.repo.UpdateStatus(ctx, id, constants.AssetStatusRetired); err != nil {
-		return fmt.Errorf("retire equipment: %w", err)
+	for i := range list {
+		if approval, ok := activeApprovals[list[i].ID]; ok {
+			list[i].DisposalStatus = string(approval.Status)
+		}
 	}
-	if err := s.audit.Log(ctx, actor, "equipment.retire", "equipment", id, fmt.Sprintf("报废设备 %s", equipment.Code)); err != nil {
-		return err
-	}
-	return nil
+	return list, total, nil
 }
 
 // TransferOwner 转移责任人。

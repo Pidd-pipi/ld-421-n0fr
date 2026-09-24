@@ -18,8 +18,10 @@ type testEnv struct {
 	equipmentService   *EquipmentService
 	borrowService      *BorrowService
 	reservationService *ReservationService
+	disposalService    *DisposalService
 	categoryService    *CategoryService
 	equipmentRepo      repository.EquipmentRepository
+	disposalRepo       repository.DisposalRepository
 	categoryID         uint
 	ownerID            uint
 }
@@ -40,12 +42,14 @@ func newTestEnv(t *testing.T) *testEnv {
 	equipmentRepo := repository.NewEquipmentRepository(db)
 	borrowRepo := repository.NewBorrowRepository(db)
 	reservationRepo := repository.NewReservationRepository(db)
+	disposalRepo := repository.NewDisposalRepository(db)
 	auditRepo := repository.NewAuditLogRepository(db)
 
 	auditService := NewAuditService(auditRepo, logger)
-	equipmentService := NewEquipmentService(equipmentRepo, categoryRepo, userRepo, auditService, logger)
-	borrowService := NewBorrowService(borrowRepo, equipmentRepo, auditService, logger)
-	reservationService := NewReservationService(reservationRepo, equipmentRepo, auditService, logger)
+	equipmentService := NewEquipmentService(equipmentRepo, categoryRepo, userRepo, disposalRepo, auditService, logger)
+	borrowService := NewBorrowService(borrowRepo, equipmentRepo, disposalRepo, auditService, logger)
+	reservationService := NewReservationService(reservationRepo, equipmentRepo, disposalRepo, auditService, logger)
+	disposalService := NewDisposalService(disposalRepo, equipmentRepo, auditService, logger)
 	categoryService := NewCategoryService(categoryRepo, logger)
 
 	role := model.Role{Code: "Admin", Name: "管理员"}
@@ -70,8 +74,10 @@ func newTestEnv(t *testing.T) *testEnv {
 		equipmentService:   equipmentService,
 		borrowService:      borrowService,
 		reservationService: reservationService,
+		disposalService:    disposalService,
 		categoryService:    categoryService,
 		equipmentRepo:      equipmentRepo,
+		disposalRepo:       disposalRepo,
 		categoryID:         category.ID,
 		ownerID:            user.ID,
 	}

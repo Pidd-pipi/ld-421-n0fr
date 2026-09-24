@@ -13,6 +13,7 @@ import {
   Select,
   Space,
   Table,
+  Tag,
   TreeSelect,
   message
 } from 'antd'
@@ -25,16 +26,26 @@ import {
   createEquipment,
   fetchEquipment,
   fetchEquipmentDetail,
-  retireEquipment,
   transferOwner,
   updateEquipment
 } from '../api/equipment'
 import { fetchBorrows } from '../api/borrow'
 import { fetchMaintenance } from '../api/maintenance'
 import { fetchUsers } from '../api/auth'
-import type { BorrowRecord, Equipment, EquipmentCategory, EquipmentPayload, MaintenanceRecord, User } from '../types'
+import { fetchEquipmentDisposal, reviewDisposal, submitDisposal } from '../api/disposal'
+import type {
+  BorrowRecord,
+  DisposalApproval,
+  DisposalReviewResult,
+  Equipment,
+  EquipmentCategory,
+  EquipmentPayload,
+  MaintenanceRecord,
+  User
+} from '../types'
 import { StatusBadge } from '../components/common/StatusBadge'
 import { CalendarCell } from '../components/common/CalendarCell'
+import { DisposalProgress } from '../components/common/DisposalProgress'
 import { formatCurrency } from '../utils/formatCurrency'
 import { usePagination } from '../hooks/usePagination'
 import { useAuthStore } from '../stores/authStore'
@@ -53,6 +64,11 @@ export function EquipmentManage() {
   const [maintenanceList, setMaintenanceList] = useState<MaintenanceRecord[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Equipment | null>(null)
+  const [disposal, setDisposal] = useState<DisposalApproval | null>(null)
+  const [retireTarget, setRetireTarget] = useState<Equipment | null>(null)
+  const [retireReason, setRetireReason] = useState('')
+  const [retireSubmitting, setRetireSubmitting] = useState(false)
+  const [reviewing, setReviewing] = useState(false)
   const [form] = Form.useForm<EquipmentPayload>()
   const pagination = usePagination()
   const user = useAuthStore((state) => state.user)
@@ -102,12 +118,19 @@ export function EquipmentManage() {
   const openDetail = async (id: number) => {
     const data = await fetchEquipmentDetail(id)
     setDetail(data)
-    const [borrows, maintenances] = await Promise.all([
+    const [borrows, maintenances, disposalData] = await Promise.all([
       fetchBorrows({ equipment_id: id, page: 1, page_size: 20 }),
-      fetchMaintenance({ equipment_id: id, page: 1, page_size: 20 })
+      fetchMaintenance({ equipment_id: id, page: 1, page_size: 20 }),
+      fetchEquipmentDisposal(id).catch(() => null)
     ])
     setBorrowHistory(borrows.list)
     setMaintenanceList(maintenances.list)
+    setDisposal(disposalData)
+  }
+
+  const closeDetail = () => {
+    setDetail(null)
+    setDisposal(null)
   }
 
   const openCreate = () => {
@@ -153,10 +176,50 @@ export function EquipmentManage() {
     load()
   }
 
-  const onRetire = async (id: number) => {
-    await retireEquipment(id)
-    message.success('设备已报废')
-    load()
+  const openRetire = (record: Equipment) => {
+    setRetireTarget(record)
+    setRetireReason('')
+  }
+
+  const submitRetire = async () => {
+    if (!retireTarget) return
+    if (!retireReason.trim()) {
+      message.warning('请填写报废原因')
+      return
+    }
+    setRetireSubmitting(true)
+    try {
+      await submitDisposal(retireTarget.id, { reason: retireReason.trim() })
+      message.success('报废处置申请已提交，等待审批')
+      setRetireTarget(null)
+      load()
+      if (detail?.id === retireTarget.id) {
+        const disposalData = await fetchEquipmentDisposal(retireTarget.id).catch(() => null)
+        setDisposal(disposalData)
+      }
+    } finally {
+      setRetireSubmitting(false)
+    }
+  }
+
+  const onReviewDisposal = async (approval: DisposalApproval) => {
+    setReviewing(true)
+    try {
+      const result: DisposalReviewResult = await reviewDisposal(approval.id)
+      setDisposal(result.approval)
+      if (result.approved) {
+        message.success('审批通过，设备已报废')
+      } else {
+        message.warning(`存在 ${result.blockers.length} 项阻塞，已退回`)
+      }
+      load()
+      if (detail) {
+        const refreshed = await fetchEquipmentDetail(detail.id).catch(() => null)
+        if (refreshed) setDetail(refreshed)
+      }
+    } finally {
+      setReviewing(false)
+    }
   }
 
   const onTransfer = async (id: number) => {
@@ -185,7 +248,30 @@ export function EquipmentManage() {
     { title: '设备名称', dataIndex: 'name' },
     { title: '分类', dataIndex: 'categoryName', width: 120 },
     { title: '品牌型号', dataIndex: 'brandModel', width: 160, ellipsis: true },
-    { title: '状态', dataIndex: 'status', width: 100, render: (value: string) => <StatusBadge status={value} /> },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      width: 130,
+      render: (value: string, record: Equipment) => (
+        <Space size={4}>
+          <StatusBadge status={value} />
+          {record.disposalStatus === 'Pending' ? <Tag color="processing">报废审批中</Tag> : null}
+        </Space>
+      )
+    },
+    {
+      title: '处置',
+      dataIndex: 'disposalFlag',
+      width: 110,
+      render: (_: unknown, record: Equipment) =>
+        canManage(user?.roleCode) && record.status !== 'Retired' && record.status !== 'Lost' ? (
+          <Button size="small" type="link" danger onClick={() => openRetire(record)}>
+            申请报废
+          </Button>
+        ) : (
+          <span style={{ color: '#999' }}>-</span>
+        )
+    },
     { title: '存放位置', dataIndex: 'location', width: 140 },
     { title: '责任人', dataIndex: 'ownerName', width: 100 },
     { title: '价格', dataIndex: 'purchasePrice', width: 120, render: (value: number) => formatCurrency(value) },
@@ -201,9 +287,6 @@ export function EquipmentManage() {
             <>
               <Button size="small" type="link" onClick={() => openEdit(record)}>
                 编辑
-              </Button>
-              <Button size="small" type="link" danger onClick={() => onRetire(record.id)}>
-                报废
               </Button>
               <Button size="small" type="link" onClick={() => onTransfer(record.id)}>
                 转移
@@ -349,7 +432,7 @@ export function EquipmentManage() {
         </Form>
       </Modal>
 
-      <Drawer title="设备详情" open={!!detail} onClose={() => setDetail(null)} width={760}>
+      <Drawer title="设备详情" open={!!detail} onClose={closeDetail} width={760}>
         {detail ? (
           <>
             <Descriptions column={2} bordered size="small">
@@ -368,6 +451,15 @@ export function EquipmentManage() {
               <Descriptions.Item label="购买日期">{detail.purchaseDate?.slice(0, 10)}</Descriptions.Item>
               <Descriptions.Item label="保修到期日">{detail.warrantyExpiry?.slice(0, 10)}</Descriptions.Item>
             </Descriptions>
+
+            {disposal ? (
+              <DisposalProgress
+                approval={disposal}
+                reviewing={reviewing}
+                canReview={canManage(user?.roleCode)}
+                onReview={onReviewDisposal}
+              />
+            ) : null}
 
             <h4 style={{ marginTop: 16 }}>未来 7 天预约</h4>
             <Row gutter={6}>
@@ -406,6 +498,27 @@ export function EquipmentManage() {
           </>
         ) : null}
       </Drawer>
+
+      <Modal
+        title={retireTarget ? `申请报废：${retireTarget.name}（${retireTarget.code}）` : '申请报废'}
+        open={!!retireTarget}
+        onCancel={() => setRetireTarget(null)}
+        onOk={submitRetire}
+        confirmLoading={retireSubmitting}
+        okText="提交处置审批"
+        okButtonProps={{ danger: true }}
+        cancelText="取消"
+      >
+        <p style={{ color: '#999' }}>提交后设备将进入处置审批，暂停新的借用和预约；审批通过后设备才会变为 Retired。</p>
+        <Input.TextArea
+          rows={3}
+          maxLength={512}
+          showCount
+          placeholder="请填写报废原因（必填），如：核心部件损坏、维修成本过高"
+          value={retireReason}
+          onChange={(e) => setRetireReason(e.target.value)}
+        />
+      </Modal>
     </Card>
   )
 }

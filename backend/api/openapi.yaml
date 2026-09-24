@@ -11,6 +11,7 @@ tags:
   - name: Borrow
   - name: Maintenance
   - name: Reservation
+  - name: Disposal
   - name: Category
   - name: Dashboard
   - name: Audit
@@ -73,13 +74,29 @@ paths:
       security: [{ bearerAuth: [] }]
       responses:
         '200': { description: 成功 }
-  /equipment/{id}/status:
-    patch:
-      tags: [Equipment]
-      summary: 修改设备资产状态（报废）
+  /equipment/{id}/disposal:
+    get:
+      tags: [Disposal]
+      summary: 查询设备的处置（报废）审批进度，无记录时 data 为 null
       security: [{ bearerAuth: [] }]
       responses:
         '200': { description: 成功 }
+    post:
+      tags: [Disposal]
+      summary: 提交设备报废处置申请（管理员/实验室管理员），提交后暂停新的借用和预约
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 512 }
+      responses:
+        '200': { description: 申请已提交，等待审批 }
+        '409': { description: '重复提交或设备状态不允许报废' }
   /equipment/{id}/owner:
     patch:
       tags: [Equipment]
@@ -87,6 +104,36 @@ paths:
       security: [{ bearerAuth: [] }]
       responses:
         '200': { description: 成功 }
+  /disposals:
+    get:
+      tags: [Disposal]
+      summary: 分页查询处置审批单
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: page_size, in: query, schema: { type: integer } }
+        - { name: status, in: query, schema: { type: string, enum: [Pending, Approved, Returned] } }
+        - { name: equipment_id, in: query, schema: { type: integer } }
+      responses:
+        '200': { description: 成功 }
+  /disposals/{id}:
+    get:
+      tags: [Disposal]
+      summary: 处置审批单详情
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功 }
+  /disposals/{id}/review:
+    post:
+      tags: [Disposal]
+      summary: >-
+        处置审批（管理员/实验室管理员）：无未归还借用/未结束预约时通过并将设备置为 Retired；
+        存在阻塞项时审批单退回（Returned）并在 blockers 中列出阻塞项，原借用/预约记录保留；
+        重复审批返回 409。
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 审批完成（approved=true 为通过，false 为退回并携带 blockers） }
+        '409': { description: 审批单已被处理 }
   /borrows:
     get:
       tags: [Borrow]

@@ -16,7 +16,6 @@ func registerEquipmentRoutes(group *gin.RouterGroup, deps Dependencies) {
 	{
 		manage.POST("", deps.EquipmentHandler.Create)
 		manage.PUT("/:id", deps.EquipmentHandler.Update)
-		manage.PATCH("/:id/status", deps.EquipmentHandler.UpdateStatus)
 		manage.PATCH("/:id/owner", deps.EquipmentHandler.TransferOwner)
 	}
 }

@@ -45,6 +45,7 @@ func mapEquipment(equipment model.Equipment) dto.EquipmentResponse {
 		PurchasePrice:  equipment.PurchasePrice,
 		Location:       equipment.Location,
 		Status:         string(equipment.Status),
+		DisposalStatus: equipment.DisposalStatus,
 		OwnerID:        equipment.OwnerID,
 		OwnerName:      ownerName,
 		Supplier:       equipment.Supplier,
@@ -163,8 +164,61 @@ func mapCategory(category model.EquipmentCategory) dto.CategoryResponse {
 	}
 }
 
-func mapAudit(log model.AuditLog) dto.AuditLogResponse {
-	return dto.AuditLogResponse{
+func mapDisposal(approval model.DisposalApproval) dto.DisposalResponse {
+	applicantName := ""
+	if approval.Applicant != nil {
+		applicantName = approval.Applicant.Name
+	}
+	reviewerName := ""
+	if approval.Reviewer != nil {
+		reviewerName = approval.Reviewer.Name
+	}
+	blockers := make([]dto.DisposalBlockerResponse, 0, len(approval.Blockers))
+	for _, blocker := range approval.Blockers {
+		blockers = append(blockers, dto.DisposalBlockerResponse{
+			Type:         blocker.Type,
+			RecordID:     blocker.RecordID,
+			UserID:       blocker.UserID,
+			UserName:     blocker.UserName,
+			Status:       blocker.Status,
+			Detail:       blocker.Detail,
+			ExpectedTime: blocker.ExpectedTime,
+		})
+	}
+	return dto.DisposalResponse{
+		ID:          approval.ID,
+		EquipmentID: approval.EquipmentID,
+		Reason:      approval.Reason,
+		Status:      string(approval.Status),
+		ApplicantID: approval.ApplicantID,
+		Applicant:   applicantName,
+		ReviewerID:  approval.ReviewerID,
+		Reviewer:    reviewerName,
+		Blockers:    blockers,
+		ReviewedAt:  approval.ReviewedAt,
+		Active:      approval.Active,
+		CreatedAt:   approval.CreatedAt,
+		UpdatedAt:   approval.UpdatedAt,
+	}
+}
+
+func mapDisposalBlockers(blockers model.DisposalBlockers) []dto.DisposalBlockerResponse {
+	result := make([]dto.DisposalBlockerResponse, 0, len(blockers))
+	for _, blocker := range blockers {
+		result = append(result, dto.DisposalBlockerResponse{
+			Type:         blocker.Type,
+			RecordID:     blocker.RecordID,
+			UserID:       blocker.UserID,
+			UserName:     blocker.UserName,
+			Status:       blocker.Status,
+			Detail:       blocker.Detail,
+			ExpectedTime: blocker.ExpectedTime,
+		})
+	}
+	return result
+}
+
+func mapAudit(log model.AuditLog) dto.AuditLogResponse {	return dto.AuditLogResponse{
 		ID:           log.ID,
 		UserID:       log.UserID,
 		UserName:     log.UserName,

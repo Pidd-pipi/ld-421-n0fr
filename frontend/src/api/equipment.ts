@@ -18,10 +18,6 @@ export function updateEquipment(id: number | string, payload: EquipmentPayload) 
   return put<Equipment>(API_PATHS.equipmentDetail(id), payload)
 }
 
-export function retireEquipment(id: number | string) {
-  return patch<null>(API_PATHS.equipmentStatus(id), { status: 'Retired' })
-}
-
 export function transferOwner(id: number | string, ownerId: number) {
   return patch<null>(API_PATHS.equipmentOwner(id), { ownerId })
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/labequipment/lab-equipment/internal/constants"
 	apperrors "github.com/labequipment/lab-equipment/internal/errors"
 	"github.com/labequipment/lab-equipment/internal/model"
 )
@@ -62,14 +63,28 @@ func TestEquipmentService_Retire(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	if err := env.equipmentService.Retire(context.Background(), created.ID, actor); err != nil {
-		t.Fatalf("retire: %v", err)
+	approval, err := env.disposalService.Submit(context.Background(), &model.DisposalApproval{
+		EquipmentID: created.ID,
+		Reason:      "设备老化严重",
+	}, actor)
+	if err != nil {
+		t.Fatalf("submit disposal: %v", err)
+	}
+	reviewed, result, err := env.disposalService.Review(context.Background(), approval.ID, actor)
+	if err != nil {
+		t.Fatalf("review disposal: %v", err)
+	}
+	if !result.Approved {
+		t.Fatalf("expected approval without blockers, got blockers: %v", result.Blockers)
+	}
+	if reviewed.Status != constants.DisposalStatusApproved {
+		t.Fatalf("expected Approved, got %s", reviewed.Status)
 	}
 	got, err := env.equipmentRepo.FindByID(context.Background(), created.ID)
 	if err != nil {
 		t.Fatalf("find: %v", err)
 	}
-	if got.Status != "Retired" {
+	if got.Status != constants.AssetStatusRetired {
 		t.Fatalf("expected Retired, got %s", got.Status)
 	}
 }

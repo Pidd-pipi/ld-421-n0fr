@@ -155,32 +155,6 @@ func (h *EquipmentHandler) Update(c *gin.Context) {
 	ok(c, mapEquipment(*updated))
 }
 
-// UpdateStatus 报废/修改设备状态。
-func (h *EquipmentHandler) UpdateStatus(c *gin.Context) {
-	id, valid := parseID(c)
-	if !valid {
-		return
-	}
-	var req dto.UpdateEquipmentStatusRequest
-	if !bindJSON(c, &req) {
-		return
-	}
-	status := constants.AssetStatus(req.Status)
-	if !status.Valid() {
-		fail(c, 400, 40000, "资产状态无效")
-		return
-	}
-	if status == constants.AssetStatusRetired {
-		if err := h.equipmentService.Retire(c.Request.Context(), id, middleware.GetActor(c)); err != nil {
-			failError(c, err)
-			return
-		}
-		ok(c, nil)
-		return
-	}
-	fail(c, 400, 40000, "仅支持 Retired 状态变更")
-}
-
 // TransferOwner 转移责任人。
 func (h *EquipmentHandler) TransferOwner(c *gin.Context) {
 	id, valid := parseID(c)

@@ -17,6 +17,7 @@ import (
 type BorrowService struct {
 	repo          repository.BorrowRepository
 	equipmentRepo repository.EquipmentRepository
+	disposalRepo  repository.DisposalRepository
 	audit         *AuditService
 	logger        *slog.Logger
 }
@@ -25,10 +26,11 @@ type BorrowService struct {
 func NewBorrowService(
 	repo repository.BorrowRepository,
 	equipmentRepo repository.EquipmentRepository,
+	disposalRepo repository.DisposalRepository,
 	audit *AuditService,
 	logger *slog.Logger,
 ) *BorrowService {
-	return &BorrowService{repo: repo, equipmentRepo: equipmentRepo, audit: audit, logger: logger}
+	return &BorrowService{repo: repo, equipmentRepo: equipmentRepo, disposalRepo: disposalRepo, audit: audit, logger: logger}
 }
 
 // Create 提交借用申请。
@@ -39,6 +41,9 @@ func (s *BorrowService) Create(ctx context.Context, record *model.BorrowRecord, 
 			return nil, apperrors.NewBusinessError(40400, 404, "设备不存在")
 		}
 		return nil, fmt.Errorf("find equipment: %w", err)
+	}
+	if err := s.ensureDisposalInactive(ctx, record.EquipmentID, "借用"); err != nil {
+		return nil, err
 	}
 	if equipment.Status != constants.AssetStatusAvailable {
 		return nil, apperrors.NewBusinessError(40900, 409, "设备当前不可借用")
@@ -168,4 +173,16 @@ func (s *BorrowService) mapNotFound(err error) error {
 		return apperrors.NewBusinessError(40400, 404, "借用记录不存在")
 	}
 	return fmt.Errorf("find borrow record: %w", err)
+}
+
+// ensureDisposalInactive 设备处于报废处置审批中时拒绝新的借用。
+func (s *BorrowService) ensureDisposalInactive(ctx context.Context, equipmentID uint, action string) error {
+	_, err := s.disposalRepo.FindActiveByEquipment(ctx, equipmentID)
+	if err == nil {
+		return apperrors.NewBusinessError(40900, 409, "设备正在报废处置审批中，已暂停"+action)
+	}
+	if !errors.Is(err, repository.ErrNotFound) {
+		return fmt.Errorf("find active disposal approval: %w", err)
+	}
+	return nil
 }

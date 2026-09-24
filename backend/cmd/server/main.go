@@ -91,6 +91,7 @@ func run(cfg *config.Config, log *slog.Logger) error {
 	borrowRepo := repository.NewBorrowRepository(db)
 	maintenanceRepo := repository.NewMaintenanceRepository(db)
 	reservationRepo := repository.NewReservationRepository(db)
+	disposalRepo := repository.NewDisposalRepository(db)
 	auditRepo := repository.NewAuditLogRepository(db)
 
 	// 服务层
@@ -98,10 +99,11 @@ func run(cfg *config.Config, log *slog.Logger) error {
 	authService := service.NewAuthService(userRepo, cfg.JWT(), log)
 	userService := service.NewUserService(userRepo, log)
 	categoryService := service.NewCategoryService(categoryRepo, log)
-	equipmentService := service.NewEquipmentService(equipmentRepo, categoryRepo, userRepo, auditService, log)
-	borrowService := service.NewBorrowService(borrowRepo, equipmentRepo, auditService, log)
+	equipmentService := service.NewEquipmentService(equipmentRepo, categoryRepo, userRepo, disposalRepo, auditService, log)
+	borrowService := service.NewBorrowService(borrowRepo, equipmentRepo, disposalRepo, auditService, log)
 	maintenanceService := service.NewMaintenanceService(maintenanceRepo, equipmentRepo, auditService, log)
-	reservationService := service.NewReservationService(reservationRepo, equipmentRepo, auditService, log)
+	reservationService := service.NewReservationService(reservationRepo, equipmentRepo, disposalRepo, auditService, log)
+	disposalService := service.NewDisposalService(disposalRepo, equipmentRepo, auditService, log)
 	dashboardService := service.NewDashboardService(equipmentRepo, borrowRepo, reservationRepo, log)
 
 	// 处理器层
@@ -113,6 +115,7 @@ func run(cfg *config.Config, log *slog.Logger) error {
 		BorrowHandler:      handler.NewBorrowHandler(borrowService),
 		MaintenanceHandler: handler.NewMaintenanceHandler(maintenanceService),
 		ReservationHandler: handler.NewReservationHandler(reservationService),
+		DisposalHandler:    handler.NewDisposalHandler(disposalService),
 		DashboardHandler:   handler.NewDashboardHandler(dashboardService),
 		AuditHandler:       handler.NewAuditHandler(auditService),
 		AuthService:        authService,

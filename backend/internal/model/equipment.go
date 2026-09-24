@@ -24,6 +24,8 @@ type Equipment struct {
 	ImageURL       string                `gorm:"size:512" json:"imageUrl"`
 	Category       *EquipmentCategory    `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
 	Owner          *User                 `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
+	// DisposalStatus 非持久化字段：存在进行中的处置审批时为 Pending，由服务层填充。
+	DisposalStatus string `gorm:"-" json:"-"`
 }
 
 func (Equipment) TableName() string { return "equipment" }

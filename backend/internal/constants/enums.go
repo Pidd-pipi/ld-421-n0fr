@@ -137,6 +137,33 @@ func (r MaintenanceResult) Valid() bool {
 	return false
 }
 
+// DisposalStatus 设备处置（报废）审批状态。
+type DisposalStatus string
+
+const (
+	DisposalStatusPending  DisposalStatus = "Pending"
+	DisposalStatusApproved DisposalStatus = "Approved"
+	DisposalStatusReturned DisposalStatus = "Returned"
+)
+
+// AllDisposalStatus 返回全部处置审批状态，供校验与下拉使用。
+func AllDisposalStatus() []DisposalStatus {
+	return []DisposalStatus{
+		DisposalStatusPending,
+		DisposalStatusApproved,
+		DisposalStatusReturned,
+	}
+}
+
+func (s DisposalStatus) Valid() bool {
+	for _, v := range AllDisposalStatus() {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
 // ReservationStatus 预约审批状态。
 type ReservationStatus string
 

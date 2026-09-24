@@ -10,6 +10,7 @@ export interface Equipment {
   purchasePrice: number
   location: string
   status: string
+  disposalStatus?: string
   ownerId: number
   ownerName?: string
   supplier: string
