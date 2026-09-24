@@ -52,24 +52,3 @@ func TestEquipmentService_Create(t *testing.T) {
 		})
 	}
 }
-
-func TestEquipmentService_Retire(t *testing.T) {
-	env := newTestEnv(t)
-	actor := Actor{UserID: env.ownerID, Username: "admin", Role: "Admin"}
-	created, err := env.equipmentService.Create(context.Background(), &model.Equipment{
-		Name: "待报废", Code: "EQ-RET", CategoryID: env.categoryID, OwnerID: env.ownerID,
-	}, actor)
-	if err != nil {
-		t.Fatalf("create: %v", err)
-	}
-	if err := env.equipmentService.Retire(context.Background(), created.ID, actor); err != nil {
-		t.Fatalf("retire: %v", err)
-	}
-	got, err := env.equipmentRepo.FindByID(context.Background(), created.ID)
-	if err != nil {
-		t.Fatalf("find: %v", err)
-	}
-	if got.Status != "Retired" {
-		t.Fatalf("expected Retired, got %s", got.Status)
-	}
-}

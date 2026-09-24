@@ -103,21 +103,6 @@ func (s *EquipmentService) List(ctx context.Context, filter repository.Equipment
 	return list, total, nil
 }
 
-// Retire 报废设备。
-func (s *EquipmentService) Retire(ctx context.Context, id uint, actor Actor) error {
-	equipment, err := s.repo.FindByID(ctx, id)
-	if err != nil {
-		return s.mapNotFound(err, "设备不存在")
-	}
-	if err := s.repo.UpdateStatus(ctx, id, constants.AssetStatusRetired); err != nil {
-		return fmt.Errorf("retire equipment: %w", err)
-	}
-	if err := s.audit.Log(ctx, actor, "equipment.retire", "equipment", id, fmt.Sprintf("报废设备 %s", equipment.Code)); err != nil {
-		return err
-	}
-	return nil
-}
-
 // TransferOwner 转移责任人。
 func (s *EquipmentService) TransferOwner(ctx context.Context, id, newOwnerID uint, actor Actor) error {
 	equipment, err := s.repo.FindByID(ctx, id)

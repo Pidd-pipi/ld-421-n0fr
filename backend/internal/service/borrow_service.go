@@ -17,6 +17,7 @@ import (
 type BorrowService struct {
 	repo          repository.BorrowRepository
 	equipmentRepo repository.EquipmentRepository
+	disposalRepo  repository.DisposalRepository
 	audit         *AuditService
 	logger        *slog.Logger
 }
@@ -25,10 +26,11 @@ type BorrowService struct {
 func NewBorrowService(
 	repo repository.BorrowRepository,
 	equipmentRepo repository.EquipmentRepository,
+	disposalRepo repository.DisposalRepository,
 	audit *AuditService,
 	logger *slog.Logger,
 ) *BorrowService {
-	return &BorrowService{repo: repo, equipmentRepo: equipmentRepo, audit: audit, logger: logger}
+	return &BorrowService{repo: repo, equipmentRepo: equipmentRepo, disposalRepo: disposalRepo, audit: audit, logger: logger}
 }
 
 // Create 提交借用申请。
@@ -42,6 +44,13 @@ func (s *BorrowService) Create(ctx context.Context, record *model.BorrowRecord, 
 	}
 	if equipment.Status != constants.AssetStatusAvailable {
 		return nil, apperrors.NewBusinessError(40900, 409, "设备当前不可借用")
+	}
+	pending, err := s.disposalRepo.HasPendingForEquipment(ctx, record.EquipmentID)
+	if err != nil {
+		return nil, fmt.Errorf("check pending disposal: %w", err)
+	}
+	if pending {
+		return nil, apperrors.NewBusinessError(40900, 409, "设备报废审批中，暂停新的借用")
 	}
 	if record.ExpectedReturnDate.Before(record.BorrowDate) {
 		return nil, apperrors.NewBusinessError(40000, 400, "预计归还日期不能早于借用日期")

@@ -4,8 +4,10 @@ export const API_PATHS = {
   users: '/api/v1/users',
   equipment: '/api/v1/equipment',
   equipmentDetail: (id: number | string) => `/api/v1/equipment/${id}`,
-  equipmentStatus: (id: number | string) => `/api/v1/equipment/${id}/status`,
   equipmentOwner: (id: number | string) => `/api/v1/equipment/${id}/owner`,
+  equipmentDisposals: (id: number | string) => `/api/v1/equipment/${id}/disposals`,
+  disposalApprove: (equipmentId: number | string, disposalId: number | string) =>
+    `/api/v1/equipment/${equipmentId}/disposals/${disposalId}/approve`,
   borrows: '/api/v1/borrows',
   borrowDetail: (id: number | string) => `/api/v1/borrows/${id}`,
   borrowApprove: (id: number | string) => `/api/v1/borrows/${id}/approve`,

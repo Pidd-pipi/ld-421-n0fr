@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  Alert,
   Button,
   Card,
   Col,
@@ -9,10 +10,12 @@ import {
   Input,
   InputNumber,
   Modal,
+  Popconfirm,
   Row,
   Select,
   Space,
   Table,
+  Tag,
   TreeSelect,
   message
 } from 'antd'
@@ -25,14 +28,14 @@ import {
   createEquipment,
   fetchEquipment,
   fetchEquipmentDetail,
-  retireEquipment,
   transferOwner,
   updateEquipment
 } from '../api/equipment'
+import { approveDisposal, fetchDisposals, submitDisposal } from '../api/disposal'
 import { fetchBorrows } from '../api/borrow'
 import { fetchMaintenance } from '../api/maintenance'
 import { fetchUsers } from '../api/auth'
-import type { BorrowRecord, Equipment, EquipmentCategory, EquipmentPayload, MaintenanceRecord, User } from '../types'
+import type { BorrowRecord, DisposalRequest, Equipment, EquipmentCategory, EquipmentPayload, MaintenanceRecord, User } from '../types'
 import { StatusBadge } from '../components/common/StatusBadge'
 import { CalendarCell } from '../components/common/CalendarCell'
 import { formatCurrency } from '../utils/formatCurrency'
@@ -40,6 +43,12 @@ import { usePagination } from '../hooks/usePagination'
 import { useAuthStore } from '../stores/authStore'
 
 const canManage = (role?: string) => role === 'Admin' || role === 'LabManager'
+
+const disposalStatusMap: Record<string, { color: string; text: string }> = {
+  Pending: { color: 'gold', text: '待审批' },
+  Approved: { color: 'green', text: '已通过' },
+  Rejected: { color: 'red', text: '已退回' }
+}
 
 export function EquipmentManage() {
   const [items, setItems] = useState<Equipment[]>([])
@@ -51,6 +60,7 @@ export function EquipmentManage() {
   const [detail, setDetail] = useState<Equipment | null>(null)
   const [borrowHistory, setBorrowHistory] = useState<BorrowRecord[]>([])
   const [maintenanceList, setMaintenanceList] = useState<MaintenanceRecord[]>([])
+  const [disposals, setDisposals] = useState<DisposalRequest[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Equipment | null>(null)
   const [form] = Form.useForm<EquipmentPayload>()
@@ -102,12 +112,14 @@ export function EquipmentManage() {
   const openDetail = async (id: number) => {
     const data = await fetchEquipmentDetail(id)
     setDetail(data)
-    const [borrows, maintenances] = await Promise.all([
+    const [borrows, maintenances, disposalList] = await Promise.all([
       fetchBorrows({ equipment_id: id, page: 1, page_size: 20 }),
-      fetchMaintenance({ equipment_id: id, page: 1, page_size: 20 })
+      fetchMaintenance({ equipment_id: id, page: 1, page_size: 20 }),
+      fetchDisposals(id)
     ])
     setBorrowHistory(borrows.list)
     setMaintenanceList(maintenances.list)
+    setDisposals(disposalList)
   }
 
   const openCreate = () => {
@@ -153,9 +165,39 @@ export function EquipmentManage() {
     load()
   }
 
-  const onRetire = async (id: number) => {
-    await retireEquipment(id)
-    message.success('设备已报废')
+  const onRetire = (id: number) => {
+    let reason = ''
+    Modal.confirm({
+      title: '提交报废申请',
+      content: (
+        <Input.TextArea
+          rows={3}
+          style={{ marginTop: 12 }}
+          placeholder="请填写报废原因，提交后设备将暂停新的借用和预约，待审批通过后才正式报废"
+          onChange={(e) => (reason = e.target.value)}
+        />
+      ),
+      onOk: async () => {
+        if (!reason.trim()) {
+          message.warning('请填写报废原因')
+          return Promise.reject(new Error('reason required'))
+        }
+        await submitDisposal(id, reason.trim())
+        message.success('报废申请已提交，等待审批')
+        load()
+      }
+    })
+  }
+
+  const onApproveDisposal = async (item: DisposalRequest) => {
+    if (!detail) return
+    const result = await approveDisposal(detail.id, item.id)
+    if (result.status === 'Approved') {
+      message.success('审批通过，设备已报废')
+    } else if (result.status === 'Rejected') {
+      message.warning(`存在 ${result.blockers?.length ?? 0} 项未归还借用或未结束预约，申请已退回`)
+    }
+    await openDetail(detail.id)
     load()
   }
 
@@ -202,7 +244,13 @@ export function EquipmentManage() {
               <Button size="small" type="link" onClick={() => openEdit(record)}>
                 编辑
               </Button>
-              <Button size="small" type="link" danger onClick={() => onRetire(record.id)}>
+              <Button
+                size="small"
+                type="link"
+                danger
+                disabled={record.status === 'Retired'}
+                onClick={() => onRetire(record.id)}
+              >
                 报废
               </Button>
               <Button size="small" type="link" onClick={() => onTransfer(record.id)}>
@@ -368,6 +416,71 @@ export function EquipmentManage() {
               <Descriptions.Item label="购买日期">{detail.purchaseDate?.slice(0, 10)}</Descriptions.Item>
               <Descriptions.Item label="保修到期日">{detail.warrantyExpiry?.slice(0, 10)}</Descriptions.Item>
             </Descriptions>
+
+            <h4 style={{ marginTop: 16 }}>报废审批</h4>
+            {disposals.length === 0 ? (
+              <div style={{ color: '#999' }}>暂无报废申请</div>
+            ) : (
+              disposals.map((item, index) => (
+                <div
+                  key={item.id}
+                  style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: 12, marginBottom: 12 }}
+                >
+                  <Space style={{ marginBottom: 8 }}>
+                    <StatusBadge status={item.status} labelMap={disposalStatusMap} />
+                    {index === 0 ? <Tag color="blue">最新</Tag> : null}
+                    <span style={{ color: '#999' }}>提交于 {dayjs(item.createdAt).format('YYYY-MM-DD HH:mm')}</span>
+                  </Space>
+                  <Descriptions column={2} size="small">
+                    <Descriptions.Item label="报废原因">{item.reason}</Descriptions.Item>
+                    <Descriptions.Item label="申请人">{item.applicantName || '-'}</Descriptions.Item>
+                    {item.approverName ? (
+                      <Descriptions.Item label="审批人">{item.approverName}</Descriptions.Item>
+                    ) : null}
+                    {item.processedAt ? (
+                      <Descriptions.Item label="处理时间">
+                        {dayjs(item.processedAt).format('YYYY-MM-DD HH:mm')}
+                      </Descriptions.Item>
+                    ) : null}
+                  </Descriptions>
+                  {item.blockers && item.blockers.length > 0 ? (
+                    <Alert
+                      style={{ marginTop: 8 }}
+                      type="warning"
+                      showIcon
+                      message={
+                        item.status === 'Pending'
+                          ? `当前阻塞项 ${item.blockers.length} 项，处理完毕后方可审批通过`
+                          : `审批退回：存在 ${item.blockers.length} 项阻塞`
+                      }
+                      description={
+                        <ul style={{ margin: 0, paddingLeft: 18 }}>
+                          {item.blockers.map((blocker) => (
+                            <li key={`${blocker.type}-${blocker.recordId}`}>
+                              {blocker.type === 'borrow' ? '借用' : '预约'} · {blocker.userName || '未知用户'} ·{' '}
+                              {blocker.detail} · <StatusBadge status={blocker.status} />
+                            </li>
+                          ))}
+                        </ul>
+                      }
+                    />
+                  ) : null}
+                  {canManage(user?.roleCode) && item.status === 'Pending' ? (
+                    <div style={{ marginTop: 8 }}>
+                      <Popconfirm
+                        title="审批通过报废申请"
+                        description="若仍存在未归还借用或未结束预约，申请将被退回。"
+                        onConfirm={() => onApproveDisposal(item)}
+                      >
+                        <Button type="primary" size="small">
+                          审批通过
+                        </Button>
+                      </Popconfirm>
+                    </div>
+                  ) : null}
+                </div>
+              ))
+            )}
 
             <h4 style={{ marginTop: 16 }}>未来 7 天预约</h4>
             <Row gutter={6}>

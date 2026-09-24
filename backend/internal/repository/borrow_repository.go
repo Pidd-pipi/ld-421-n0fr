@@ -19,6 +19,7 @@ type BorrowRepository interface {
 	List(ctx context.Context, filter BorrowFilter) ([]model.BorrowRecord, int64, error)
 	CountPending(ctx context.Context) (int64, error)
 	TopEquipmentThisMonth(ctx context.Context, limit int) ([]BorrowTopStat, error)
+	ListUnreturnedByEquipment(ctx context.Context, equipmentID uint) ([]model.BorrowRecord, error)
 }
 
 // BorrowFilter 借用记录筛选条件。
@@ -103,6 +104,25 @@ func (r *borrowRepository) CountPending(ctx context.Context) (int64, error) {
 		return 0, fmt.Errorf("count pending borrow records: %w", err)
 	}
 	return count, nil
+}
+
+// ListUnreturnedByEquipment 查询设备未归还的借用记录（待审批/已借出/已逾期），用于报废审批阻塞检查。
+func (r *borrowRepository) ListUnreturnedByEquipment(ctx context.Context, equipmentID uint) ([]model.BorrowRecord, error) {
+	var list []model.BorrowRecord
+	err := r.db.WithContext(ctx).
+		Preload("Borrower").
+		Where("equipment_id = ?", equipmentID).
+		Where("status IN ?", []constants.BorrowStatus{
+			constants.BorrowStatusPending,
+			constants.BorrowStatusApproved,
+			constants.BorrowStatusOverdue,
+		}).
+		Order("id ASC").
+		Find(&list).Error
+	if err != nil {
+		return nil, fmt.Errorf("list unreturned borrow records: %w", err)
+	}
+	return list, nil
 }
 
 func (r *borrowRepository) TopEquipmentThisMonth(ctx context.Context, limit int) ([]BorrowTopStat, error) {

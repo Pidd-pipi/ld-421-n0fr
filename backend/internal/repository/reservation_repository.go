@@ -19,6 +19,7 @@ type ReservationRepository interface {
 	List(ctx context.Context, filter ReservationFilter) ([]model.Reservation, int64, error)
 	CountPending(ctx context.Context) (int64, error)
 	HasConflict(ctx context.Context, equipmentID uint, start, end time.Time, excludeID uint) (bool, error)
+	ListUnfinishedByEquipment(ctx context.Context, equipmentID uint, now time.Time) ([]model.Reservation, error)
 }
 
 // ReservationFilter 预约记录筛选条件。
@@ -95,6 +96,25 @@ func (r *reservationRepository) CountPending(ctx context.Context) (int64, error)
 		return 0, fmt.Errorf("count pending reservations: %w", err)
 	}
 	return count, nil
+}
+
+// ListUnfinishedByEquipment 查询设备未结束的预约（待审批/已通过且结束时间未到），用于报废审批阻塞检查。
+func (r *reservationRepository) ListUnfinishedByEquipment(ctx context.Context, equipmentID uint, now time.Time) ([]model.Reservation, error) {
+	var list []model.Reservation
+	err := r.db.WithContext(ctx).
+		Preload("User").
+		Where("equipment_id = ?", equipmentID).
+		Where("status IN ?", []constants.ReservationStatus{
+			constants.ReservationStatusPending,
+			constants.ReservationStatusApproved,
+		}).
+		Where("end_time > ?", now).
+		Order("id ASC").
+		Find(&list).Error
+	if err != nil {
+		return nil, fmt.Errorf("list unfinished reservations: %w", err)
+	}
+	return list, nil
 }
 
 func (r *reservationRepository) HasConflict(ctx context.Context, equipmentID uint, start, end time.Time, excludeID uint) (bool, error) {

@@ -73,13 +73,36 @@ paths:
       security: [{ bearerAuth: [] }]
       responses:
         '200': { description: 成功 }
-  /equipment/{id}/status:
-    patch:
+  /equipment/{id}/disposals:
+    get:
       tags: [Equipment]
-      summary: 修改设备资产状态（报废）
+      summary: 设备报废申请列表（含审批进度、原因与阻塞项）
       security: [{ bearerAuth: [] }]
       responses:
         '200': { description: 成功 }
+    post:
+      tags: [Equipment]
+      summary: 提交报废申请（提交后暂停新的借用与预约）
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string }
+      responses:
+        '200': { description: 成功 }
+        '409': { description: 已存在待审批申请或设备已报废 }
+  /equipment/{id}/disposals/{disposalId}/approve:
+    post:
+      tags: [Equipment]
+      summary: 审批报废申请（存在未归还借用或未结束预约时列出阻塞项并退回；通过后设备转为 Retired）
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 成功（通过或退回均返回最新申请单与阻塞项） }
+        '409': { description: 申请已被处理（并发审批冲突） }
   /equipment/{id}/owner:
     patch:
       tags: [Equipment]

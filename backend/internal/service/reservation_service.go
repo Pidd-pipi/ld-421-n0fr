@@ -16,6 +16,7 @@ import (
 type ReservationService struct {
 	repo          repository.ReservationRepository
 	equipmentRepo repository.EquipmentRepository
+	disposalRepo  repository.DisposalRepository
 	audit         *AuditService
 	logger        *slog.Logger
 }
@@ -24,10 +25,11 @@ type ReservationService struct {
 func NewReservationService(
 	repo repository.ReservationRepository,
 	equipmentRepo repository.EquipmentRepository,
+	disposalRepo repository.DisposalRepository,
 	audit *AuditService,
 	logger *slog.Logger,
 ) *ReservationService {
-	return &ReservationService{repo: repo, equipmentRepo: equipmentRepo, audit: audit, logger: logger}
+	return &ReservationService{repo: repo, equipmentRepo: equipmentRepo, disposalRepo: disposalRepo, audit: audit, logger: logger}
 }
 
 // Create 创建预约。
@@ -40,6 +42,13 @@ func (s *ReservationService) Create(ctx context.Context, reservation *model.Rese
 			return nil, apperrors.NewBusinessError(40400, 404, "设备不存在")
 		}
 		return nil, fmt.Errorf("find equipment: %w", err)
+	}
+	pending, err := s.disposalRepo.HasPendingForEquipment(ctx, reservation.EquipmentID)
+	if err != nil {
+		return nil, fmt.Errorf("check pending disposal: %w", err)
+	}
+	if pending {
+		return nil, apperrors.NewBusinessError(40900, 409, "设备报废审批中，暂停新的预约")
 	}
 	conflict, err := s.repo.HasConflict(ctx, reservation.EquipmentID, reservation.StartTime, reservation.EndTime, 0)
 	if err != nil {

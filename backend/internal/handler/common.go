@@ -64,7 +64,11 @@ func bindJSON(c *gin.Context, obj any) bool {
 }
 
 func parseID(c *gin.Context) (uint, bool) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	return parseParamID(c, "id")
+}
+
+func parseParamID(c *gin.Context, param string) (uint, bool) {
+	id, err := strconv.ParseUint(c.Param(param), 10, 64)
 	if err != nil || id == 0 {
 		fail(c, http.StatusBadRequest, constants.CodeBadRequest, "无效的 ID")
 		return 0, false

@@ -34,11 +34,6 @@ type UpdateEquipmentRequest struct {
 	ImageURL       string  `json:"imageUrl" binding:"omitempty,max=512"`
 }
 
-// UpdateEquipmentStatusRequest 修改设备资产状态。
-type UpdateEquipmentStatusRequest struct {
-	Status string `json:"status" binding:"required"`
-}
-
 // TransferOwnerRequest 转移责任人。
 type TransferOwnerRequest struct {
 	OwnerID uint `json:"ownerId" binding:"required"`

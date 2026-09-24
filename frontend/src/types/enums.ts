@@ -45,3 +45,10 @@ export const ReservationStatus = {
   Cancelled: 'Cancelled'
 } as const
 export type ReservationStatus = (typeof ReservationStatus)[keyof typeof ReservationStatus]
+
+export const DisposalStatus = {
+  Pending: 'Pending',
+  Approved: 'Approved',
+  Rejected: 'Rejected'
+} as const
+export type DisposalStatus = (typeof DisposalStatus)[keyof typeof DisposalStatus]

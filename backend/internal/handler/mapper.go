@@ -3,6 +3,7 @@ package handler
 import (
 	"github.com/labequipment/lab-equipment/internal/dto"
 	"github.com/labequipment/lab-equipment/internal/model"
+	"github.com/labequipment/lab-equipment/internal/service"
 )
 
 func mapUser(user model.User) dto.UserResponse {
@@ -145,6 +146,46 @@ func mapReservation(reservation model.Reservation) dto.ReservationResponse {
 		ApproverID:    reservation.ApproverID,
 		ApproverName:  approverName,
 		CreatedAt:     reservation.CreatedAt,
+	}
+}
+
+func mapDisposalItem(item service.DisposalItem) dto.DisposalResponse {
+	request := item.Request
+	equipmentName := ""
+	if request.Equipment != nil {
+		equipmentName = request.Equipment.Name
+	}
+	applicantName := ""
+	if request.Applicant != nil {
+		applicantName = request.Applicant.Name
+	}
+	approverName := ""
+	if request.Approver != nil {
+		approverName = request.Approver.Name
+	}
+	blockers := make([]dto.DisposalBlocker, 0, len(item.Blockers))
+	for _, blocker := range item.Blockers {
+		blockers = append(blockers, dto.DisposalBlocker{
+			Type:     blocker.Type,
+			RecordID: blocker.RecordID,
+			Status:   blocker.Status,
+			UserName: blocker.UserName,
+			Detail:   blocker.Detail,
+		})
+	}
+	return dto.DisposalResponse{
+		ID:            request.ID,
+		EquipmentID:   request.EquipmentID,
+		EquipmentName: equipmentName,
+		Reason:        request.Reason,
+		Status:        string(request.Status),
+		ApplicantID:   request.ApplicantID,
+		ApplicantName: applicantName,
+		ApproverID:    request.ApproverID,
+		ApproverName:  approverName,
+		Blockers:      blockers,
+		ProcessedAt:   request.ProcessedAt,
+		CreatedAt:     request.CreatedAt,
 	}
 }
 

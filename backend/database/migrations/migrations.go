@@ -17,6 +17,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&model.BorrowRecord{},
 		&model.MaintenanceRecord{},
 		&model.Reservation{},
+		&model.DisposalRequest{},
 		&model.AuditLog{},
 	}
 	for _, m := range models {
